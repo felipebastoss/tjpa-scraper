@@ -1,0 +1,11 @@
+services:
+  scraper:
+    build: .
+    container_name: tjpa_scraper_app
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
