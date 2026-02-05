@@ -30,11 +30,13 @@ class TestCSVExporter:
     def test_creates_export_directory(self, temp_dir):
         """Test that export directory is created on initialization."""
         export_path = os.path.join(temp_dir, "new_dir")
-        exporter = CSVExporter(export_path=export_path)
+        CSVExporter(export_path=export_path)
 
         assert os.path.exists(export_path)
 
-    def test_export_creates_csv_file(self, csv_exporter, sample_process, temp_dir):
+    def test_export_creates_csv_file(
+        self, csv_exporter, sample_process, temp_dir
+    ):
         """Test that export creates a CSV file."""
         csv_exporter.export(sample_process, "test_process")
 
@@ -54,7 +56,9 @@ class TestCSVExporter:
         assert sample_process.formatted_number in content
         assert sample_process.class_ in content
 
-    def test_export_overwrites_existing_file(self, csv_exporter, sample_process, temp_dir):
+    def test_export_overwrites_existing_file(
+        self, csv_exporter, sample_process, temp_dir
+    ):
         """Test that export overwrites existing file."""
         csv_exporter.export(sample_process, "test_process")
 
@@ -86,18 +90,22 @@ class TestJSONExporter:
     def test_creates_export_directory(self, temp_dir):
         """Test that export directory is created on initialization."""
         export_path = os.path.join(temp_dir, "new_dir")
-        exporter = JSONExporter(export_path=export_path)
+        JSONExporter(export_path=export_path)
 
         assert os.path.exists(export_path)
 
-    def test_export_creates_json_file(self, json_exporter, sample_process, temp_dir):
+    def test_export_creates_json_file(
+        self, json_exporter, sample_process, temp_dir
+    ):
         """Test that export creates a JSON file."""
         json_exporter.export(sample_process, "test_process")
 
         file_path = os.path.join(temp_dir, "test_process.json")
         assert os.path.exists(file_path)
 
-    def test_export_json_content(self, json_exporter, sample_process, temp_dir):
+    def test_export_json_content(
+        self, json_exporter, sample_process, temp_dir
+    ):
         """Test that exported JSON has correct content."""
         json_exporter.export(sample_process, "test_process")
 
@@ -112,7 +120,9 @@ class TestJSONExporter:
         assert len(data["parties"]) == 1
         assert len(data["movements"]) == 1
 
-    def test_export_json_is_formatted(self, json_exporter, sample_process, temp_dir):
+    def test_export_json_is_formatted(
+        self, json_exporter, sample_process, temp_dir
+    ):
         """Test that exported JSON is properly formatted with indentation."""
         json_exporter.export(sample_process, "test_process")
 
@@ -133,7 +143,9 @@ class TestJSONExporter:
             cd_doc_process="999",
             cd_instance="1",
             parties=[Party(name="José Açaí", party_type="Autor")],
-            movements=[Movement(date="01/01/2026", description="Petição juntada")],
+            movements=[
+                Movement(date="01/01/2026", description="Petição juntada")
+            ],
             jurisdiction="São Paulo",
             competence="Cível",
             instance="1º Grau",

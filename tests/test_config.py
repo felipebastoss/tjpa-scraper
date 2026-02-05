@@ -1,7 +1,5 @@
 """Tests for the ScraperConfig class."""
 
-import pytest
-
 from config import ScraperConfig
 
 
@@ -12,7 +10,10 @@ class TestScraperConfig:
         """Test that ScraperConfig has correct default values."""
         config = ScraperConfig()
 
-        assert config.base_url == "https://consulta-processual-unificada-prd.tjpa.jus.br"
+        assert (
+            config.base_url
+            == "https://consulta-processual-unificada-prd.tjpa.jus.br"
+        )
         assert config.base_api_route == "/consilium-rest"
         assert config.movements_api_route == "/movimentacaopublicobycnj/"
         assert config.default_page_size == 1000

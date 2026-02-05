@@ -1,7 +1,8 @@
 """Tests for RequestType entity."""
 
-import pytest
 from urllib.parse import quote
+
+import pytest
 
 from entities.request_type import RequestType
 from exceptions import InvalidRequestError
@@ -111,11 +112,17 @@ class TestRequestTypeGetRouteByType:
 
     def test_nome_parte_route(self):
         """Test party name route."""
-        assert RequestType.NOME_PARTE.get_route_by_type() == "/processobynomeparte/"
+        assert (
+            RequestType.NOME_PARTE.get_route_by_type()
+            == "/processobynomeparte/"
+        )
 
     def test_nome_parte_exato_route(self):
         """Test exact party name route."""
-        assert RequestType.NOME_PARTE_EXATO.get_route_by_type() == "/processobynomeparteexato/"
+        assert (
+            RequestType.NOME_PARTE_EXATO.get_route_by_type()
+            == "/processobynomeparteexato/"
+        )
 
     def test_oab_route(self):
         """Test OAB route."""

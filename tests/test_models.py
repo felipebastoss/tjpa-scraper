@@ -1,7 +1,5 @@
 """Tests for data models."""
 
-import pytest
-
 from models.movement import Movement
 from models.party import Party
 from models.process import Process
@@ -34,7 +32,9 @@ class TestMovement:
 
     def test_creation(self):
         """Test Movement instance creation."""
-        movement = Movement(date="01/02/2026", description="Juntada de petição")
+        movement = Movement(
+            date="01/02/2026", description="Juntada de petição"
+        )
         assert movement.date == "01/02/2026"
         assert movement.description == "Juntada de petição"
 
@@ -45,14 +45,22 @@ class TestMovement:
 
     def test_to_dict(self):
         """Test Movement to_dict method."""
-        movement = Movement(date="20/04/2026", description="Sentença proferida")
+        movement = Movement(
+            date="20/04/2026", description="Sentença proferida"
+        )
         result = movement.to_dict()
 
-        assert result == {"date": "20/04/2026", "description": "Sentença proferida"}
+        assert result == {
+            "date": "20/04/2026",
+            "description": "Sentença proferida",
+        }
 
     def test_from_dict(self):
         """Test Movement from_dict class method."""
-        data = {"dataFormatada": "10/05/2026", "descricao": "Audiência realizada"}
+        data = {
+            "dataFormatada": "10/05/2026",
+            "descricao": "Audiência realizada",
+        }
         movement = Movement.from_dict(data)
 
         assert movement.date == "10/05/2026"

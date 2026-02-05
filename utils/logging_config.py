@@ -35,11 +35,14 @@ def setup_logging(
     console_handler.setFormatter(console_format)
 
     # File handler
-    log_file = os.path.join(log_dir, f"scraper_{datetime.now():%Y%m%d_%H%M%S}.log")
+    log_file = os.path.join(
+        log_dir, f"scraper_{datetime.now():%Y%m%d_%H%M%S}.log"
+    )
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_format = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+        "%(asctime)s - %(name)s - %(levelname)s - "
+        "%(funcName)s:%(lineno)d - %(message)s"
     )
     file_handler.setFormatter(file_format)
 

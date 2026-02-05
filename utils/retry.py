@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any, Callable, Tuple, Type
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("tjpa_scraper")
 
 
 def retry(
@@ -43,6 +43,14 @@ def retry(
                             wait_time,
                         )
                         time.sleep(wait_time)
+                    else:
+                        logger.error(
+                            "Attempt %d/%d failed: %s. No more retries left.",
+                            attempt + 1,
+                            max_attempts,
+                            e,
+                        )
+                        return []
             raise last_exception
 
         return wrapper

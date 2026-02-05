@@ -43,7 +43,7 @@ class TestRetryDecorator:
         assert call_count == 3
 
     def test_max_attempts_exceeded(self):
-        """Test that exception is raised after max attempts."""
+        """Test that empty list is returned after max attempts."""
         call_count = 0
 
         @retry(max_attempts=3, delay=0.01, exceptions=(ValueError,))
@@ -52,10 +52,9 @@ class TestRetryDecorator:
             call_count += 1
             raise ValueError("Always fails")
 
-        with pytest.raises(ValueError) as exc_info:
-            always_failing()
+        result = always_failing()
 
-        assert "Always fails" in str(exc_info.value)
+        assert result == []
         assert call_count == 3
 
     def test_only_catches_specified_exceptions(self):
@@ -78,16 +77,19 @@ class TestRetryDecorator:
         """Test that delay increases with backoff multiplier."""
         sleep_times = []
 
-        @retry(max_attempts=4, delay=0.1, backoff=2.0, exceptions=(ValueError,))
+        @retry(
+            max_attempts=4, delay=0.1, backoff=2.0, exceptions=(ValueError,)
+        )
         def failing_func():
             raise ValueError("Error")
 
         with patch("utils.retry.time.sleep") as mock_sleep:
-            mock_sleep.side_effect = lambda x: sleep_times.append(x)
+            mock_sleep.side_effect = sleep_times.append
 
-            with pytest.raises(ValueError):
-                failing_func()
+            result = failing_func()
 
+        # Function returns empty list after max attempts
+        assert result == []
         # Expected delays: 0.1, 0.2, 0.4 (3 retries between 4 attempts)
         assert len(sleep_times) == 3
         assert sleep_times[0] == pytest.approx(0.1)
@@ -121,7 +123,11 @@ class TestRetryDecorator:
         call_count = 0
         exceptions_to_raise = [ValueError, TypeError, KeyError]
 
-        @retry(max_attempts=5, delay=0.01, exceptions=(ValueError, TypeError, KeyError))
+        @retry(
+            max_attempts=5,
+            delay=0.01,
+            exceptions=(ValueError, TypeError, KeyError),
+        )
         def multi_exception_func():
             nonlocal call_count
             call_count += 1

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from client.api_client import ApiClient
+from exceptions import ProcessNotFoundError
 from models.movement import Movement
 from models.process import Process
 from services.export_service import ExportService
@@ -34,7 +35,9 @@ class TestMovementService:
         self, movement_service, sample_process, sample_api_movement_response
     ):
         """Test successful movement fetching."""
-        movement_service.api_client.get.return_value = sample_api_movement_response
+        movement_service.api_client.get.return_value = (
+            sample_api_movement_response
+        )
 
         result = movement_service.get_movements(sample_process)
 
@@ -77,15 +80,22 @@ class TestMovementService:
         # First call returns partial results
         first_response = {
             "qtdRegistrosTotal": 2,
-            "listaResultado": [{"dataFormatada": "01/01/2026", "descricao": "Movimento 1"}],
+            "listaResultado": [
+                {"dataFormatada": "01/01/2026", "descricao": "Movimento 1"}
+            ],
         }
         # Second call returns more results
         second_response = {
             "qtdRegistrosTotal": 2,
-            "listaResultado": [{"dataFormatada": "02/01/2026", "descricao": "Movimento 2"}],
+            "listaResultado": [
+                {"dataFormatada": "02/01/2026", "descricao": "Movimento 2"}
+            ],
         }
 
-        movement_service.api_client.get.side_effect = [first_response, second_response]
+        movement_service.api_client.get.side_effect = [
+            first_response,
+            second_response,
+        ]
 
         result = movement_service.get_movements(sample_process)
 
@@ -111,10 +121,24 @@ class TestProcessService:
         return service
 
     @pytest.fixture
-    def process_service(self, mock_api_client, mock_movement_service):
+    def export_service(self):
+        """Return an ExportService instance."""
+        service = MagicMock(spec=ExportService)
+        service.export.return_value = None
+        return service
+
+    @pytest.fixture
+    def process_service(
+        self,
+        mock_api_client,
+        mock_movement_service,
+        export_service,
+    ):
         """Return a ProcessService instance."""
         return ProcessService(
-            api_client=mock_api_client, movement_service=mock_movement_service
+            api_client=mock_api_client,
+            movement_service=mock_movement_service,
+            export_service=export_service,
         )
 
     def test_get_processes_with_cnj(
@@ -125,11 +149,16 @@ class TestProcessService:
             "listaProcessos": [sample_api_process_response]
         }
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
+        # get_processes returns None and exports inline
+        process_service.get_processes("0801234-56.2026.8.14.0301")
 
-        assert len(result) == 1
-        assert isinstance(result[0], Process)
-        assert result[0].number == "08012345620268140301"
+        # Verify export was called with the process
+        process_service.export_service.export.assert_called_once()
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert isinstance(exported_process, Process)
+        assert exported_process.number == "08012345620268140301"
 
     def test_get_processes_fetches_movements(
         self, process_service, sample_api_process_response
@@ -139,23 +168,32 @@ class TestProcessService:
             "listaProcessos": [sample_api_process_response]
         }
         mock_movements = [Movement(date="01/01/2026", description="Test")]
-        process_service.movement_service.get_movements.return_value = mock_movements
+        process_service.movement_service.get_movements.return_value = (
+            mock_movements
+        )
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
+        process_service.get_processes("0801234-56.2026.8.14.0301")
 
         process_service.movement_service.get_movements.assert_called_once()
-        assert result[0].movements == mock_movements
+        # Check that exported process has movements
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert exported_process.movements == mock_movements
 
     def test_get_processes_empty_result(self, process_service):
-        """Test fetching processes with no results."""
+        """
+        Test fetching processes with no results raises ProcessNotFoundError.
+        """
         process_service.api_client.get.return_value = {"listaResultado": []}
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
-
-        assert result == []
+        with pytest.raises(ProcessNotFoundError):
+            process_service.get_processes("0801234-56.2026.8.14.0301")
 
     def test_get_processes_with_list_response(self, process_service):
-        """Test fetching processes when API returns a list directly with numero field."""
+        """
+        Test fetching processes when API returns a list with numero field.
+        """
         list_response = [
             {
                 "numero": "08012345620268140301",
@@ -170,16 +208,10 @@ class TestProcessService:
         ]
         process_service.api_client.get.return_value = list_response
 
-        result = process_service.get_processes("08012345620268140301")
+        process_service.get_processes("08012345620268140301")
 
-        assert len(result) == 1
-
-    def test_movement_service_auto_created(self, mock_api_client):
-        """Test that MovementService is auto-created if not provided."""
-        service = ProcessService(api_client=mock_api_client)
-
-        assert service.movement_service is not None
-        assert isinstance(service.movement_service, MovementService)
+        # Verify export was called
+        process_service.export_service.export.assert_called_once()
 
 
 class TestProcessServiceApiResponseFormats:
@@ -200,10 +232,24 @@ class TestProcessServiceApiResponseFormats:
         return service
 
     @pytest.fixture
-    def process_service(self, mock_api_client, mock_movement_service):
+    def export_service(self):
+        """Return an ExportService instance."""
+        service = MagicMock(spec=ExportService)
+        service.export.return_value = None
+        return service
+
+    @pytest.fixture
+    def process_service(
+        self,
+        mock_api_client,
+        mock_movement_service,
+        export_service,
+    ):
         """Return a ProcessService instance."""
         return ProcessService(
-            api_client=mock_api_client, movement_service=mock_movement_service
+            api_client=mock_api_client,
+            movement_service=mock_movement_service,
+            export_service=export_service,
         )
 
     @pytest.fixture
@@ -224,27 +270,26 @@ class TestProcessServiceApiResponseFormats:
             "partes": [{"nome": "João da Silva", "tipo": "Autor"}],
         }
 
-    # =========================================================================
-    # Format 1: Direct list of processes
-    # [sample_process, ...]
-    # =========================================================================
-
     def test_format1_direct_list_of_processes(
         self, process_service, sample_process_data
     ):
         """Test API response format 1: direct list of process objects."""
-        # Add required fields for list detection (nome=None, sistema=None means direct process)
+
         process_data = {**sample_process_data, "nome": None, "sistema": None}
         api_response = [process_data]
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("08012345620268140301")
+        process_service.get_processes("08012345620268140301")
 
-        assert len(result) == 1
-        assert isinstance(result[0], Process)
-        assert result[0].number == "08012345620268140301"
-        assert result[0].formatted_number == "0801234-56.2026.8.14.0301"
+        # Verify export was called with the correct process
+        process_service.export_service.export.assert_called_once()
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert isinstance(exported_process, Process)
+        assert exported_process.number == "08012345620268140301"
+        assert exported_process.formatted_number == "0801234-56.2026.8.14.0301"
 
     def test_format1_direct_list_multiple_processes(
         self, process_service, sample_process_data
@@ -264,10 +309,10 @@ class TestProcessServiceApiResponseFormats:
 
         process_service.api_client.get.return_value = processes
 
-        result = process_service.get_processes("08012345620268140301")
+        process_service.get_processes("08012345620268140301")
 
-        assert len(result) == 3
-        assert all(isinstance(p, Process) for p in result)
+        # Verify export was called 3 times (once per process)
+        assert process_service.export_service.export.call_count == 3
 
     def test_format1_direct_list_fetches_movements_for_each(
         self, process_service, sample_process_data
@@ -277,28 +322,32 @@ class TestProcessServiceApiResponseFormats:
         api_response = [process_data]
 
         process_service.api_client.get.return_value = api_response
-        mock_movements = [Movement(date="01/01/2026", description="Test movement")]
-        process_service.movement_service.get_movements.return_value = mock_movements
+        mock_movements = [
+            Movement(date="01/01/2026", description="Test movement")
+        ]
+        process_service.movement_service.get_movements.return_value = (
+            mock_movements
+        )
 
-        result = process_service.get_processes("08012345620268140301")
+        process_service.get_processes("08012345620268140301")
 
         process_service.movement_service.get_movements.assert_called_once()
-        assert result[0].movements == mock_movements
-
-    # =========================================================================
-    # Format 2: Pre-search party name response (list of name/system objects)
-    # [{"nome": "string", "quantidade": "string", "sistema": "string"}, ...]
-    # =========================================================================
+        # Check that exported process has movements
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert exported_process.movements == mock_movements
 
     def test_format2_presearch_party_name_single_result(
         self, process_service, sample_process_data
     ):
-        """Test API response format 2: pre-search party name with single result."""
-        # First call returns pre-search result
+        """
+        Test API response format 2: pre-search party name with single result.
+        """
         presearch_response = [
             {"nome": "Jose Antonio", "quantidade": "1", "sistema": "PROJUDI"}
         ]
-        # Second call returns actual process data
+
         process_response = {"listaProcessos": [sample_process_data]}
 
         process_service.api_client.get.side_effect = [
@@ -306,23 +355,31 @@ class TestProcessServiceApiResponseFormats:
             process_response,
         ]
 
-        result = process_service.get_processes("Jose Antonio")
+        process_service.get_processes("Jose Antonio")
 
-        assert len(result) == 1
-        assert isinstance(result[0], Process)
-        # Should have made 2 API calls: presearch + actual fetch
+        # Verify export was called
+        process_service.export_service.export.assert_called_once()
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert isinstance(exported_process, Process)
+
         assert process_service.api_client.get.call_count == 2
 
     def test_format2_presearch_party_name_multiple_systems(
         self, process_service, sample_process_data
     ):
         """Test format 2 with multiple systems returned in pre-search."""
-        # First call returns pre-search with multiple systems
+
         presearch_response = [
             {"nome": "Jose Antonio", "quantidade": "2", "sistema": "PROJUDI"},
-            {"nome": "Jose Antonio", "quantidade": "1", "sistema": "TUCUJURIS"},
+            {
+                "nome": "Jose Antonio",
+                "quantidade": "1",
+                "sistema": "TUCUJURIS",
+            },
         ]
-        # Subsequent calls return process data for each system
+
         projudi_response = {"listaProcessos": [sample_process_data]}
         tucujuris_process = {
             **sample_process_data,
@@ -337,10 +394,11 @@ class TestProcessServiceApiResponseFormats:
             tucujuris_response,
         ]
 
-        result = process_service.get_processes("Jose Antonio")
+        process_service.get_processes("Jose Antonio")
 
-        assert len(result) == 2
-        # Should have made 3 API calls: presearch + 2 system fetches
+        # Verify export was called twice (once per process)
+        assert process_service.export_service.export.call_count == 2
+
         assert process_service.api_client.get.call_count == 3
 
     def test_format2_presearch_empty_nome_or_sistema_skipped(
@@ -349,8 +407,16 @@ class TestProcessServiceApiResponseFormats:
         """Test that pre-search items without nome or sistema are skipped."""
         presearch_response = [
             {"nome": "Jose Antonio", "quantidade": "1", "sistema": "PROJUDI"},
-            {"nome": None, "quantidade": "0", "sistema": "TUCUJURIS"},  # Should be skipped
-            {"nome": "Maria", "quantidade": "0", "sistema": None},  # Should be skipped
+            {
+                "nome": None,
+                "quantidade": "0",
+                "sistema": "TUCUJURIS",
+            },
+            {
+                "nome": "Maria",
+                "quantidade": "0",
+                "sistema": None,
+            },
         ]
         process_response = {"listaProcessos": [sample_process_data]}
 
@@ -359,15 +425,9 @@ class TestProcessServiceApiResponseFormats:
             process_response,
         ]
 
-        result = process_service.get_processes("Jose Antonio")
+        process_service.get_processes("Jose Antonio")
 
-        # Only one system should have been fetched (the valid one)
         assert process_service.api_client.get.call_count == 2
-
-    # =========================================================================
-    # Format 3: One process response (usually CNJ search)
-    # {"numero": "string", "numeroFormatado": "string", "listaProcessos": [...]}
-    # =========================================================================
 
     def test_format3_cnj_single_process_response(
         self, process_service, sample_process_data
@@ -381,11 +441,15 @@ class TestProcessServiceApiResponseFormats:
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
+        process_service.get_processes("0801234-56.2026.8.14.0301")
 
-        assert len(result) == 1
-        assert isinstance(result[0], Process)
-        assert result[0].number == "08012345620268140301"
+        # Verify export was called with correct process
+        process_service.export_service.export.assert_called_once()
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert isinstance(exported_process, Process)
+        assert exported_process.number == "08012345620268140301"
 
     def test_format3_cnj_multiple_processes_in_list(
         self, process_service, sample_process_data
@@ -405,14 +469,15 @@ class TestProcessServiceApiResponseFormats:
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
+        process_service.get_processes("0801234-56.2026.8.14.0301")
 
-        assert len(result) == 2
-        assert result[0].number == "08012345620268140301"
-        assert result[1].number == "08099999920268140301"
+        # Verify export was called twice
+        assert process_service.export_service.export.call_count == 2
 
     def test_format3_cnj_empty_lista_processos(self, process_service):
-        """Test format 3 with empty listaProcessos."""
+        """
+        Test format 3 with empty listaProcessos raises ProcessNotFoundError.
+        """
         api_response = {
             "numero": "08012345620268140301",
             "numeroFormatado": "0801234-56.2026.8.14.0301",
@@ -421,15 +486,8 @@ class TestProcessServiceApiResponseFormats:
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
-
-        assert result == []
-
-    # =========================================================================
-    # Format 4: Search response with pagination
-    # {"pagina": int, "qtdRegistrosPagina": int, "qtdRegistrosTotal": int,
-    #  "listaResultado": [{"numero": ..., "listaProcessos": [...]}, ...]}
-    # =========================================================================
+        with pytest.raises(ProcessNotFoundError):
+            process_service.get_processes("0801234-56.2026.8.14.0301")
 
     def test_format4_paginated_search_single_page(
         self, process_service, sample_process_data
@@ -443,24 +501,24 @@ class TestProcessServiceApiResponseFormats:
                 {
                     "numero": "08012345620268140301",
                     "numeroFormatado": "0801234-56.2026.8.14.0301",
-                    **sample_process_data,
+                    "listaProcessos": [sample_process_data],
                 }
             ],
         }
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("12345678901")  # CPF format
+        process_service.get_processes("12345678901")  # CPF format
 
-        assert len(result) == 1
-        assert isinstance(result[0], Process)
+        # Verify export was called
+        process_service.export_service.export.assert_called_once()
+        exported_process = process_service.export_service.export.call_args[0][
+            0
+        ]
+        assert isinstance(exported_process, Process)
 
-    def test_format4_paginated_search_multiple_pages(
-        self, process_service
-    ):
+    def test_format4_paginated_search_multiple_pages(self, process_service):
         """Test format 4 with multiple pages requiring pagination."""
-        # Use simple process data without nested lists for pagination tests
-        # (the code uses frozenset for deduplication which doesn't support nested lists)
         process1 = {
             "numero": "08012345620268140301",
             "numeroFormatado": "0801234-56.2026.8.14.0301",
@@ -477,30 +535,33 @@ class TestProcessServiceApiResponseFormats:
             "cdDocProcesso": "99999",
             "cdInstancia": "1",
         }
-        # First page
         first_page = {
             "pagina": 1,
             "qtdRegistrosPagina": 1,
             "qtdRegistrosTotal": 2,
-            "listaResultado": [process1],
+            "listaResultado": [{"listaProcessos": [process1]}],
         }
-        # Second page
         second_page = {
             "pagina": 2,
             "qtdRegistrosPagina": 1,
             "qtdRegistrosTotal": 2,
-            "listaResultado": [process2],
+            "listaResultado": [{"listaProcessos": [process2]}],
         }
 
         process_service.api_client.get.side_effect = [first_page, second_page]
 
-        result = process_service.get_processes("123.456.789-01", page_number=1, page_size=1)
+        process_service.get_processes(
+            "123.456.789-01", page_number=1, page_size=1
+        )
 
-        assert len(result) == 2
+        # Verify export was called twice (once per process)
+        assert process_service.export_service.export.call_count == 2
         assert process_service.api_client.get.call_count == 2
 
     def test_format4_paginated_search_empty_result(self, process_service):
-        """Test format 4 with empty listaResultado."""
+        """
+        Test format 4 with empty listaResultado raises ProcessNotFoundError.
+        """
         api_response = {
             "pagina": 1,
             "qtdRegistrosPagina": 10,
@@ -510,16 +571,15 @@ class TestProcessServiceApiResponseFormats:
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("12345678901")
-
-        assert result == []
+        with pytest.raises(ProcessNotFoundError):
+            process_service.get_processes("12345678901")
 
     def test_format4_paginated_search_deduplicates_existing_results(
         self, process_service
     ):
-        """Test that format 4 deduplicates existing results before extending."""
-        # The deduplication in the code happens on `result` before extending with new items
-        # This test verifies that duplicates in the accumulated result are removed
+        """
+        Test that format 4 deduplicates existing results before extending.
+        """
         process1 = {
             "numero": "08012345620268140301",
             "numeroFormatado": "0801234-56.2026.8.14.0301",
@@ -540,38 +600,39 @@ class TestProcessServiceApiResponseFormats:
             "pagina": 1,
             "qtdRegistrosPagina": 1,
             "qtdRegistrosTotal": 2,
-            "listaResultado": [process1],
+            "listaResultado": [{"listaProcessos": [process1]}],
         }
         second_page = {
             "pagina": 2,
             "qtdRegistrosPagina": 1,
             "qtdRegistrosTotal": 2,
-            "listaResultado": [process2],
+            "listaResultado": [{"listaProcessos": [process2]}],
         }
 
         process_service.api_client.get.side_effect = [first_page, second_page]
 
-        result = process_service.get_processes("123.456.789-01", page_number=1, page_size=1)
+        process_service.get_processes(
+            "123.456.789-01", page_number=1, page_size=1
+        )
 
-        # Both unique processes should be returned
-        assert len(result) == 2
-        numbers = [p.number for p in result]
-        assert "08012345620268140301" in numbers
-        assert "08099999920268140302" in numbers
-
-    # =========================================================================
-    # Edge cases and error handling
-    # =========================================================================
+        # Both unique processes should be exported
+        assert process_service.export_service.export.call_count == 2
+        exported_numbers = [
+            call[0][0].number
+            for call in process_service.export_service.export.call_args_list
+        ]
+        assert "08012345620268140301" in exported_numbers
+        assert "08099999920268140302" in exported_numbers
 
     def test_list_response_without_numero_raises_error(self, process_service):
-        """Test that list response without 'numero' field raises AttributeError."""
-        # Direct list but missing 'numero' field
+        """
+        Test that list response without 'numero' field raises AttributeError.
+        """
         api_response = [
             {
                 "nome": None,
                 "sistema": None,
                 "classe": "Classe",
-                # Missing 'numero' field
             }
         ]
 
@@ -580,23 +641,23 @@ class TestProcessServiceApiResponseFormats:
         with pytest.raises(AttributeError) as exc_info:
             process_service.get_processes("08012345620268140301")
 
-        assert "Nenhum processo encontrado" in str(exc_info.value)
+        assert "No processes found" in str(exc_info.value)
 
     def test_response_with_no_lista_processos_and_no_lista_resultado(
         self, process_service
     ):
-        """Test response without listaProcessos or listaResultado returns empty."""
+        """
+        Test response without listaProcessos or listaResultado raises error.
+        """
         api_response = {
             "numero": "08012345620268140301",
             "someOtherField": "value",
-            # No listaProcessos or listaResultado
         }
 
         process_service.api_client.get.return_value = api_response
 
-        result = process_service.get_processes("0801234-56.2026.8.14.0301")
-
-        assert result == []
+        with pytest.raises(ProcessNotFoundError):
+            process_service.get_processes("0801234-56.2026.8.14.0301")
 
 
 class TestExportService:
@@ -613,32 +674,46 @@ class TestExportService:
         """Return an ExportService instance."""
         return ExportService(config=scraper_config, base_dir=temp_dir)
 
-    def test_export_creates_csv_and_json(self, export_service, sample_process, temp_dir):
+    def test_export_creates_csv_and_json(
+        self, export_service, sample_process, temp_dir
+    ):
         """Test that export creates both CSV and JSON files."""
-        export_service.export([sample_process])
+        export_service.export(sample_process)
 
-        csv_dir = os.path.join(temp_dir, "data", export_service.config.csv_export_path)
-        json_dir = os.path.join(temp_dir, "data", export_service.config.json_export_path)
+        csv_dir = os.path.join(
+            temp_dir, "data", export_service.config.csv_export_path
+        )
+        json_dir = os.path.join(
+            temp_dir, "data", export_service.config.json_export_path
+        )
 
-        # Check directories were created
         assert os.path.exists(csv_dir)
         assert os.path.exists(json_dir)
 
-        # Check files were created
         expected_filename = (
-            f"process_{sample_process.number}_doc_{sample_process.cd_doc_process}"
+            f"process_{sample_process.number}"
+            f"_doc_{sample_process.cd_doc_process}"
             f"_instance_{sample_process.cd_instance}"
         )
-        assert os.path.exists(os.path.join(csv_dir, f"{expected_filename}.csv"))
-        assert os.path.exists(os.path.join(json_dir, f"{expected_filename}.json"))
+        assert os.path.exists(
+            os.path.join(csv_dir, f"{expected_filename}.csv")
+        )
+        assert os.path.exists(
+            os.path.join(json_dir, f"{expected_filename}.json")
+        )
 
-    def test_export_json_content(self, export_service, sample_process, temp_dir):
+    def test_export_json_content(
+        self, export_service, sample_process, temp_dir
+    ):
         """Test that exported JSON has correct content."""
-        export_service.export([sample_process])
+        export_service.export(sample_process)
 
-        json_dir = os.path.join(temp_dir, "data", export_service.config.json_export_path)
+        json_dir = os.path.join(
+            temp_dir, "data", export_service.config.json_export_path
+        )
         expected_filename = (
-            f"process_{sample_process.number}_doc_{sample_process.cd_doc_process}"
+            f"process_{sample_process.number}"
+            f"_doc_{sample_process.cd_doc_process}"
             f"_instance_{sample_process.cd_instance}.json"
         )
         json_path = os.path.join(json_dir, expected_filename)
@@ -651,7 +726,7 @@ class TestExportService:
         assert data["class"] == sample_process.class_
 
     def test_export_multiple_processes(self, export_service, temp_dir):
-        """Test exporting multiple processes."""
+        """Test exporting multiple processes one at a time."""
         processes = [
             Process(
                 formatted_number=f"1234-{i}",
@@ -666,8 +741,12 @@ class TestExportService:
             for i in range(3)
         ]
 
-        export_service.export(processes)
+        # Export each process individually
+        for process in processes:
+            export_service.export(process)
 
-        json_dir = os.path.join(temp_dir, "data", export_service.config.json_export_path)
+        json_dir = os.path.join(
+            temp_dir, "data", export_service.config.json_export_path
+        )
         json_files = os.listdir(json_dir)
         assert len(json_files) == 3

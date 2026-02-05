@@ -33,7 +33,23 @@ class Process:
     distribution_date: str = ""
 
     def __str__(self):
-        return f"Processo {self.formatted_number}, Classe: {self.class_}, Assunto: {self.topic}, Jurisdição: {self.jurisdiction}, Competência: {self.competence}, Instância: {self.instance}, Situação: {self.situation}, Órgão Julgador: {self.court}, Inquérito Policial: {self.police_inquiry}, Valor da Causa: {self.cause_value}, Data da Autuação: {self.citation_date}, Segredo de Justiça: {self.justice_secret}, Distribuído em {self.distribution_date}, Partes: {len(self.parties)}, Movimentações: {len(self.movements)}"
+        return (
+            f"Processo {self.formatted_number}, "
+            f"Classe: {self.class_}, "
+            f"Assunto: {self.topic}, "
+            f"Jurisdição: {self.jurisdiction}, "
+            f"Competência: {self.competence}, "
+            f"Instância: {self.instance}, "
+            f"Situação: {self.situation}, "
+            f"Órgão Julgador: {self.court}, "
+            f"Inquérito Policial: {self.police_inquiry}, "
+            f"Valor da Causa: {self.cause_value}, "
+            f"Data da Autuação: {self.citation_date}, "
+            f"Segredo de Justiça: {self.justice_secret}, "
+            f"Distribuído em {self.distribution_date}, "
+            f"Partes: {len(self.parties)}, "
+            f"Movimentações: {len(self.movements)}"
+        )
 
     def to_csv_export(self) -> Dict[str, Any]:
         """Convert to dictionary for CSV export."""
@@ -52,7 +68,7 @@ class Process:
             "Segredo de Justiça": self.justice_secret,
             "Data de Distribuição": self.distribution_date,
             "Partes": "\n".join([str(party) for party in self.parties]),
-            "Movimentações": "\n".join([str(movement) for movement in self.movements]),
+            "Movimentações": "\n".join([str(m) for m in self.movements]),
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -75,7 +91,7 @@ class Process:
             "justice_secret": self.justice_secret,
             "distribution_date": self.distribution_date,
             "parties": [party.to_dict() for party in self.parties],
-            "movements": [movement.to_dict() for movement in self.movements],
+            "movements": [m.to_dict() for m in self.movements],
         }
 
     @classmethod

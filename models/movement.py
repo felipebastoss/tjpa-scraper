@@ -1,4 +1,6 @@
-"""Module defining the Movement data model for legal process movements/events."""
+"""
+Module defining the Movement data model for legal process movements/events.
+"""
 
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -35,4 +37,7 @@ class Movement:
         Returns:
             A new Movement instance
         """
-        return cls(date=data.get("dataFormatada"), description=data.get("descricao"))
+        return cls(
+            date=data.get("dataFormatada"),
+            description=data.get("descricao"),
+        )

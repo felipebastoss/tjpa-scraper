@@ -6,9 +6,14 @@ Este projeto traz a implementação de um scraper para o portal de consultas do 
 
 ## Descrição da fonte
 
-Ao acessar o link disponibilizado para consulta: https://consulta-processual-unificada-prd.tjpa.jus.br/#/consulta, evidencia-se uma consulta que, no primeiro momento, aparenta ser complexa dada a presença de um captcha, porém com somente um campo de busca.
+Ao acessar o link disponibilizado para consulta: https://consulta-processual-unificada-prd.tjpa.jus.br/#/consulta, evidencia-se uma consulta que, no primeiro momento, aparenta ser complexa dada a presença de um captcha, porém a mesma é realizada com o preenchimento de somente um campo de busca.
 
-A fonte permite a consulta através de diversas entradas diferentes, como o número do processo, CPF de uma parte, CNPJ de uma parte, Nome de uma parte, Número do Inquerito Policial e Número da OAB. Ao realizar a busca, é retornado algumas possíveis seleções, podendo diferir inicialmente mas levando, em alguns cliques, para a visualização de um processo em específico.
+A fonte permite a consulta através de diversas entradas diferentes, como o número do processo, CPF da parte, CNPJ da parte, Nome da parte, Número do Inquerito Policial e Número da OAB. Ao realizar a busca, podemos ter os seguintes retornos visuais:
+
+* Uma lista de nomes (é o retorno padrão para a busca pelo nome da parte). Ao selecionar um dos nomes retornado, é exibida a lista de processos para aquele nome.
+* Uma lista de processos diretamente.
+
+Estando na listagem de processos, o usuário pode selecionar um dos items para a visualização dos dados.
 
 Ao visualizar um processo, temos acesso às informações do processo, como Número do processo, Partes, Classe, Assunto, Valor da causa, Movimentações, Documentos.
 
@@ -16,7 +21,7 @@ Ao visualizar um processo, temos acesso às informações do processo, como Núm
 
 No primeiro momento, avaliei o html da página para entender como fazer a extração das informações, porém pude observar que a página utilizava um html gerado através de um script.js, o que fazia com que ele não fosse carregado diretamente ao requisitar a url. 
 
-Dado o problema supracitado, decidi partir para a abordagem de avaliar as requisições feitas pela página para entender o fluxo de transferência de dados realizada e pude encontrar as requisições feitas para a API de consulta dos processos. 
+Dado isto, decidi partir para a abordagem de avaliar as requisições feitas pela página para entender o fluxo de transferência de dados realizada e pude encontrar as requisições feitas para a API de consulta dos processos. 
 
 Durante a análise, também observei que o captcha presente na primeira página não afetava nenhuma das requisições feitas para a API, o que me permitia não resolver ele e partir diretamente para as consultas. 
 
@@ -41,7 +46,7 @@ Para a obtenção das movimentações de um processo, temos somente uma única r
 Para garantir consistência nas consultas e dados, foram implementadas algumas tratativas:
 
 * Caso não seja possível obter as informações de movimentações de um processo, o processo será exportado sem movimentações.
-* Tanto nas buscas de processos, quanto nas buscas de movimentações, foi implementado um mecanismo para deduplicação dos resultados.
+* Tanto nas buscas de processos, quanto nas buscas de movimentações, foi implementado um mecanismo para deduplicação dos resultados. Esse mecanismo foi implementado pois a fonte, durante a paginação, retornava o mesmo elemento em páginas diferentes.
 
 ## Resultados obtidos
 
@@ -51,12 +56,21 @@ Após a implementação da solução, foi obtido um sistema que consulta os proc
 
 Para executar a solução, pode ser feito de duas formas, as quais irei descrever a seguir.
 
+Padrões da entrada para busca:
+* CPF - "12345678909" ou "123.456.789-09"
+* CNPJ - "123456789000123" ou "12.456.789/0001-23" 
+* CNJ - "00025935220188140051" ou "0002593-52.2018.8.14.0051"
+* Nome Parte - Nome e sobrenome. Ex: Maria Silva
+* Nome Exato - Nome e sobrenome entre aspas duplas. Ex: "Maria Silva"
+* OAB - 'oab:' ou 'oab' seguido do número + UF. Ex: "OAB:12345BA", "oab123456ba" ou "OAB123457ba"
+* Inquerito policial - 'inq:' seguido do número do inquerito policial. Ex: "inq:12345"
+
 1. Utilizando Docker:
     -
-    O projeto possui um arquivo docker-compose, que já contém toda a configuração necessária para rodar, mesmo que não possua o Python instalado.
+    O projeto possui um arquivo docker-compose, que já contém toda a configuração necessária para rodar, mesmo que não possua o Python instalado. É necessário ter o Docker instalado. Pode baixa-lo [aqui](https://www.docker.com/get-started/).
 
     Estando no diretório do projeto, utilize o seguinte comando para executa-lo:
-    ```
+    ```docker
     docker compose run scraper python main.py args
     ```
     
@@ -65,18 +79,20 @@ Para executar a solução, pode ser feito de duas formas, as quais irei descreve
 2. Utilizando Python diretamente:
     -
 
+    O projeto foi implementado na versão 3.12.2 do python.
+
     Para executar o projeto utilizando Python diretamente, é necessário instalar as bibliotecas requeridas pelo projeto. Recomendo a utilização de um ambiente virtual antes de prosseguir. O ambiente virtual pode ser criado a partir ds comandos a seguir (Caso não queira utilizar um ambiente virtual, pode pular para a próxima etapa):
-    ```
+    ```python
     python -m venv venv
     source venv/bin/activate
     ```
     Para instalar as bibliotecas necessárias, utilize o seguinte comando:
-    ```
+    ```python
     pip install -r requeriments.txt
     ```
 
     Assim que todas as bibliotecas estiverem instaladas, pode executar o projeto a partir do comando:
-    ```
+    ```python
     python main.py
     ```
 
@@ -97,3 +113,22 @@ Após executar o projeto, independente da forma escolhida, teremos alguns output
 
 * Implementar um sistema mais robusto de requisições, permitindo um paralelismo sem comprometer o RateLimit da fonte.
 * Incrementar o que é exportado nos logs, para um melhor entendimento e facilitar a análise de problemas a partir deles.
+* Realizar a coleta dos documentos do processo.
+
+## Testes
+
+O projeto conta com testes unitários, garantindo o funcionamento do scraper implementado.
+
+Para executar os testes, utilizaremos a biblioteca `pytest`. Se já instalou as bibliotecas necessárias através do arquivo `requirements.txt`, ela já estará instalada corretamente.
+
+Utilize o comando a seguir para executar os testes:
+
+Em python:
+```python
+python -m pytest
+```
+
+ou, utilizando o docker:
+```docker
+docker compose run scraper python -m pytest
+```

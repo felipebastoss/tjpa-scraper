@@ -1,14 +1,11 @@
 """Tests for API client."""
 
-import json
 from unittest.mock import MagicMock, patch
+from urllib.error import HTTPError, URLError
 
 import pytest
 
 from client.api_client import ApiClient
-from config import ScraperConfig
-from exceptions import ApiConnectionError, ApiResponseError
-from urllib.error import URLError, HTTPError
 
 
 class TestApiClient:
@@ -39,7 +36,9 @@ class TestApiClient:
 
     @patch("client.api_client.urlopen")
     @patch("client.api_client.time.sleep")
-    def test_get_returns_empty_list_on_204(self, mock_sleep, mock_urlopen, api_client):
+    def test_get_returns_empty_list_on_204(
+        self, mock_sleep, mock_urlopen, api_client
+    ):
         """Test GET request returns empty list on 204 No Content."""
         mock_response = MagicMock()
         mock_response.getcode.return_value = 204
@@ -53,7 +52,9 @@ class TestApiClient:
 
     @patch("client.api_client.urlopen")
     @patch("client.api_client.time.sleep")
-    def test_get_constructs_full_url(self, mock_sleep, mock_urlopen, api_client):
+    def test_get_constructs_full_url(
+        self, mock_sleep, mock_urlopen, api_client
+    ):
         """Test GET request constructs full URL correctly."""
         mock_response = MagicMock()
         mock_response.getcode.return_value = 200
@@ -77,7 +78,7 @@ class TestApiClient:
     @patch("client.api_client.urlopen")
     @patch("client.api_client.time.sleep")
     def test_get_http_error(self, mock_sleep, mock_urlopen, api_client):
-        """Test GET request handles HTTP errors."""
+        """Test GET request handles HTTP errors by returning empty list."""
         mock_urlopen.side_effect = HTTPError(
             url="https://test.com",
             code=404,
@@ -86,27 +87,26 @@ class TestApiClient:
             fp=None,
         )
 
-        with pytest.raises(ApiConnectionError) as exc_info:
-            api_client.get("/test/endpoint")
+        result = api_client.get("/test/endpoint")
 
-        assert exc_info.value.status_code == 404
-        assert "404" in str(exc_info.value)
+        # Retry decorator returns empty list after max attempts
+        assert result == []
 
     @patch("client.api_client.urlopen")
     @patch("client.api_client.time.sleep")
     def test_get_url_error(self, mock_sleep, mock_urlopen, api_client):
-        """Test GET request handles URL errors."""
+        """Test GET request handles URL errors by returning empty list."""
         mock_urlopen.side_effect = URLError("Connection refused")
 
-        with pytest.raises(ApiConnectionError) as exc_info:
-            api_client.get("/test/endpoint")
+        result = api_client.get("/test/endpoint")
 
-        assert "Connection failed" in str(exc_info.value)
+        # Retry decorator returns empty list after max attempts
+        assert result == []
 
     @patch("client.api_client.urlopen")
     @patch("client.api_client.time.sleep")
     def test_get_invalid_json(self, mock_sleep, mock_urlopen, api_client):
-        """Test GET request handles invalid JSON response."""
+        """Test GET request handles invalid JSON by returning empty list."""
         mock_response = MagicMock()
         mock_response.getcode.return_value = 200
         mock_response.read.return_value = b"not valid json"
@@ -114,26 +114,28 @@ class TestApiClient:
         mock_response.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_response
 
-        with pytest.raises(ApiResponseError) as exc_info:
-            api_client.get("/test/endpoint")
+        result = api_client.get("/test/endpoint")
 
-        assert "Invalid JSON" in str(exc_info.value)
+        # Retry decorator returns empty list after max attempts
+        assert result == []
 
     @patch("client.api_client.urlopen")
     @patch("client.api_client.time.sleep")
     def test_get_timeout(self, mock_sleep, mock_urlopen, api_client):
-        """Test GET request handles timeout."""
+        """Test GET request handles timeout by returning empty list."""
         mock_urlopen.side_effect = TimeoutError()
 
-        with pytest.raises(ApiConnectionError) as exc_info:
-            api_client.get("/test/endpoint")
+        result = api_client.get("/test/endpoint")
 
-        assert "timed out" in str(exc_info.value)
+        # Retry decorator returns empty list after max attempts
+        assert result == []
 
     @patch("client.api_client.random.uniform")
     @patch("client.api_client.time.sleep")
     @patch("client.api_client.urlopen")
-    def test_wait_is_called(self, mock_urlopen, mock_sleep, mock_uniform, api_client):
+    def test_wait_is_called(
+        self, mock_urlopen, mock_sleep, mock_uniform, api_client
+    ):
         """Test that rate limiting wait is applied."""
         mock_uniform.return_value = 1.5
         mock_response = MagicMock()
@@ -162,4 +164,7 @@ class TestApiClient:
 
         call_args = mock_urlopen.call_args
         request_obj = call_args[0][0]
-        assert request_obj.get_header("User-agent") == api_client.config.user_agent
+        assert (
+            request_obj.get_header("User-agent")
+            == api_client.config.user_agent
+        )

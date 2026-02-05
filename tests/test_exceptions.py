@@ -1,7 +1,5 @@
 """Tests for custom exceptions."""
 
-import pytest
-
 from exceptions import (
     ApiConnectionError,
     ApiResponseError,

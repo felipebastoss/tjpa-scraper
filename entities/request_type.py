@@ -1,4 +1,8 @@
-"""Module defining the RequestType class for identifying and handling different types of legal process requests."""
+"""
+Module defining the RequestType class.
+
+Identify and handle different types of legal process requests.
+"""
 
 import re
 from enum import Enum
@@ -8,7 +12,9 @@ from exceptions import InvalidRequestError
 
 
 class RequestType(Enum):
-    """Class to identify and handle different types of legal process requests."""
+    """
+    Class to identify and handle different types of legal process requests.
+    """
 
     CNJ = "Numero do CNJ"
     NOME_PARTE = "Nome da Parte"
@@ -20,26 +26,39 @@ class RequestType(Enum):
 
     @classmethod
     def _get_patterns(cls) -> dict:
+        pt_chars = r"a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7"
+        name_char = rf"[{pt_chars}-]"
+        name_char_space = rf"[{pt_chars}\- ]"
+
         patterns = {
             cls.CNJ: re.compile(
-                r"^[0-9]{7}-[0-9]{2}.[0-9]{4}.[0-9]{1}.[0-9]{2}.[0-9]{4}$|^[0-9]{20}$"
+                r"^[0-9]{7}-[0-9]{2}.[0-9]{4}.[0-9]{1}.[0-9]{2}.[0-9]{4}$"
+                r"|^[0-9]{20}$"
             ),
-            cls.CPF: re.compile(r"^[0-9]{11}$|^[0-9]{3}.[0-9]{3}.[0-9]{3}-[0-9]{2}$"),
+            cls.CPF: re.compile(
+                r"^[0-9]{11}$|^[0-9]{3}.[0-9]{3}.[0-9]{3}-[0-9]{2}$",
+            ),
             cls.CNPJ: re.compile(
                 r"^[0-9]{14}$|^[0-9]{2}.[0-9]{3}.[0-9]{3}/[0-9]{4}-[0-9]{2}$"
             ),
-            cls.OAB: re.compile(r"^(OAB):*[0-9]{1,}[a-zA-Z]{2}$", re.IGNORECASE),
+            cls.OAB: re.compile(
+                r"^(OAB):*[0-9]{1,}[a-zA-Z]{2}$",
+                re.IGNORECASE,
+            ),
             cls.NOME_PARTE: re.compile(
-                r"^[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7-]{1,}s{1,2}[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7-]{1,}[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7\- ]{0,}.{0,}$",
+                rf"^{name_char}{{1,}}\s{{1,2}}{name_char}{{1,}}"
+                rf"{name_char_space}{{0,}}.{{0,}}$",
                 re.IGNORECASE,
             ),
             cls.NOME_PARTE_EXATO: re.compile(
-                r"^\"[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7-]{1,}s{1,2}[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7-]{1,}[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7\- ]{0,}\"$",
+                rf"^\"{name_char}{{1,}}\s{{1,2}}{name_char}{{1,}}"
+                rf"{name_char_space}{{0,}}\"$",
                 re.IGNORECASE,
             ),
             cls.INQ: re.compile(r"^(inq):[0-9]{4}.[0-9]{1,}$", re.IGNORECASE),
             "SINGLE_NAME": re.compile(
-                r"^\"s{0,}[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7-]{1,}s{0,1}\"$|^s{0,}[a-zA-Z\xf5\xe3\xe1\xed\xf3\xfa\xe9\xf4\xea\xe2\xe7-]{1,}s{0,1}$",
+                rf"^\"\s{{0,}}{name_char}{{1,}}\s{{0,1}}\"$"
+                rf"|^\s{{0,}}{name_char}{{1,}}\s{{0,1}}$",
                 re.IGNORECASE,
             ),
         }
@@ -104,15 +123,21 @@ class RequestType(Enum):
         page_number: int = None,
         page_size: int = None,
     ) -> str:
-        """Construct the full API request URL based on the request type and parameters."""
+        """
+        Construct API request URL based on the RequestType and parameters.
+        """
         route = self.get_route_by_type()
         if route is None:
-            raise ValueError("Tipo de requisição inválido para construção da URL.")
+            raise ValueError(
+                "Tipo de requisição inválido para construção da URL.",
+            )
         if self in [RequestType.NOME_PARTE, RequestType.NOME_PARTE_EXATO]:
             request_data = quote(request_data)
         if self not in [RequestType.NOME_PARTE, RequestType.CNJ]:
             page_number = 1
             page_size = 1000
+        if self in [RequestType.CPF, RequestType.CNPJ]:
+            request_data = re.sub(r"[^\d]", "", request_data)
         url = f"{route}{request_data}"
         if self is RequestType.OAB:
             match = re.search(r"(\d+)([a-z]{2})$", request_data, re.IGNORECASE)
